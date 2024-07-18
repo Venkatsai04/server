@@ -31,7 +31,7 @@ app.get('/', async (req, res) => {
       let latestData = await sensorSchema.find();
 
       const data = latestData[latestData.length - 1];
-      console.log(data);
+      // console.log(data);
 
       if (latestData) {
           res.send(data);
