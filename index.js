@@ -24,37 +24,50 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Define routes
 
-// GET route to fetch data from MongoDB
-// GET route to fetch data from MongoDB
+// GET route to fetch the latest data from MongoDB
 app.get('/', async (req, res) => {
   try {
-      // Fetch all documents
-      let data = await sensorSchema.find();
+      // Fetch the most recent document
+      let latestData = await sensorSchema.find();
 
-      // Check the number of documents
-      if (data.length > 20) {
-          // Get the IDs of the documents to delete
-          const idsToDelete = data.slice(0, -20).map(doc => doc._id);
-          // Delete documents by IDs
-          await sensorSchema.deleteMany({ _id: { $in: idsToDelete } });
-          // Fetch data again after deletion
-          data = await sensorSchema.find();
+      const data = latestData[latestData.length - 1];
+      console.log(data);
+
+      if (latestData) {
+          res.send(data);
+      } else {
+          res.status(404).send("No data found");
       }
-
-      // Send the latest document
-      const latestData = data[data.length - 1];
-      res.send(latestData);
   } catch (err) {
       res.status(500).send(err);
   }
 });
 
-
-// POST route to save data to MongoDB
+// POST route to save data to MongoDB and delete old documents if they exceed 20
 app.post('/send', async (req, res) => {
     try {
         const response = req.body;
+        // Save the new data
         const savedData = await sensorSchema.create(response);
+        
+        // Fetch all documents
+        const dataCount = await sensorSchema.countDocuments();
+
+        // Check if the number of documents exceeds 20
+        if (dataCount > 20) {
+            // Fetch the IDs of the oldest documents to delete
+            const idsToDelete = await sensorSchema.find()
+                .sort({ createdAt: 1 }) // Sort in ascending order by createdAt to get the oldest documents
+                .limit(dataCount - 20)  // Limit to the number of documents that need to be deleted
+                .select('_id');         // Select only the _id field
+
+            // Extract the IDs from the result
+            const deleteIds = idsToDelete.map(doc => doc._id);
+
+            // Delete the oldest documents
+            await sensorSchema.deleteMany({ _id: { $in: deleteIds } });
+        }
+
         res.send(savedData);
     } catch (err) {
         res.status(500).send(err);
